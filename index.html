@@ -1,0 +1,462 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Flyte 2 Controller Routing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+  /* Layout: one centered column, a title, one scalable SVG diagram, a short legend */
+  :root {
+    --bg: #f5f7f9;
+    --panel: #ffffff;
+    --fg: #1b2530;
+    --muted: #5b6b7a;
+    --line: #8a9aaa;
+    --task: #e7eef6;
+    --local: #9a5b13;
+    --local-bg: #f8eedd;
+    --user: #2f7d5b;
+    --user-bg: #e4f2e9;
+    --internal-bg: #eceef1;
+    --cell-bg: #f7f8f9;
+    --cmt: #4f7f62;
+    --str: #a3412c;
+    --remote: #2f5f9e;
+    --lavender: #7a68c4;
+    --warn-bg: #ffd84d;
+    --warn-fg: #3a2a00;
+    --warn-edge: #b38600;
+    --loe-high-bg: #c62828;
+    --loe-high-fg: #ffffff;
+    --loe-med-bg: #f08a24;
+    --loe-med-fg: #2a1600;
+    --loe-low-bg: #fbf1b0;
+    --loe-low-fg: #3a3200;
+    --loe-xlow-bg: #c9efc9;
+    --loe-xlow-fg: #123a12;
+    --remote-bg: #e5edf8;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11161c; --panel: #18202a; --fg: #e3e9ef; --muted: #9aa8b6; --line: #6c7c8c;
+      --task: #1f2a37; --local: #e3a65a; --local-bg: #2a2116; --user: #6cc79c; --user-bg: #15261d; --internal-bg: #1c2229; --cell-bg: #0f141a; --cmt: #86b89a; --str: #e39a7f; --remote: #7fa8e6; --remote-bg: #172235; --warn-bg: #e0b400; --warn-fg: #1f1600; --warn-edge: #ffd84d; --loe-high-bg: #e05a5a; --loe-high-fg: #1a0000; --loe-med-bg: #f4a14d; --loe-med-fg: #1f1000; --loe-low-bg: #e9dc8a; --loe-low-fg: #1f1a00; --loe-xlow-bg: #9fd89f; --loe-xlow-fg: #0d260d;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11161c; --panel: #18202a; --fg: #e3e9ef; --muted: #9aa8b6; --line: #6c7c8c;
+    --task: #1f2a37; --local: #e3a65a; --local-bg: #2a2116; --user: #6cc79c; --user-bg: #15261d; --internal-bg: #1c2229; --cell-bg: #0f141a; --cmt: #86b89a; --str: #e39a7f; --remote: #7fa8e6; --remote-bg: #172235; --warn-bg: #e0b400; --warn-fg: #1f1600; --warn-edge: #ffd84d; --loe-high-bg: #e05a5a; --loe-high-fg: #1a0000; --loe-med-bg: #f4a14d; --loe-med-fg: #1f1000; --loe-low-bg: #e9dc8a; --loe-low-fg: #1f1a00; --loe-xlow-bg: #9fd89f; --loe-xlow-fg: #0d260d;
+    color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+  main { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 48px; display: grid; gap: 20px; }
+  h1 { font-size: 1.5rem; margin: 0; text-wrap: balance; }
+  p { margin: 0; color: var(--muted); line-height: 1.55; max-width: 68ch; }
+  code { font-family: var(--font-mono); font-size: 0.92em; }
+  .wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  svg { display: block; width: 100%; min-width: 860px; height: auto; }
+  svg text { font-family: var(--font-body); fill: var(--fg); }
+  svg .mono { font-family: var(--font-mono); }
+  svg .muted { fill: var(--muted); }
+  svg .zone { font-size: 12px; letter-spacing: 0.08em; fill: var(--muted); }
+  .box-task { fill: var(--task); stroke: var(--line); }
+  .box-core { fill: var(--panel); stroke: var(--fg); stroke-width: 1.5; }
+  .box-local { fill: var(--local-bg); stroke: var(--local); stroke-width: 1.5; }
+  .box-remote { fill: var(--remote-bg); stroke: var(--remote); stroke-width: 1.5; }
+  .arrow { stroke: var(--line); stroke-width: 1.5; fill: none; marker-end: url(#head); }
+  .arrow-local { stroke: var(--local); stroke-width: 1.5; fill: none; marker-end: url(#head-local); }
+  .arrow-remote { stroke: var(--remote); stroke-width: 1.5; fill: none; marker-end: url(#head-remote); }
+  .divider { stroke: var(--line); stroke-dasharray: 5 5; }
+  .t-local { fill: var(--local); }
+  .t-remote { fill: var(--remote); }
+  ul { margin: 0; padding-left: 1.2em; color: var(--muted); line-height: 1.6; max-width: 72ch; }
+  table.cmp { width: 100%; border-collapse: collapse; table-layout: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 0.95rem; }
+  table.cmp th, table.cmp td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent); overflow-wrap: anywhere; line-height: 1.45; }
+  table.cmp thead th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  table.cmp tbody th { font-weight: 600; width: 24%; }
+  table.cmp tr:last-child th, table.cmp tr:last-child td { border-bottom: 0; }
+  table.cmp tr.key { background: color-mix(in srgb, var(--remote-bg) 70%, transparent); }
+  table.cmp col.c1 { width: 24%; } table.cmp col.c2, table.cmp col.c3 { width: 38%; }
+  h2 { font-size: 1.05rem; margin: 0; }
+  section.cmp-wrap { display: grid; gap: 10px; }
+  .col-user { fill: var(--user-bg); stroke: var(--user); stroke-width: 1; }
+  .col-internal { fill: var(--internal-bg); stroke: var(--line); stroke-width: 1; }
+  .box-user { fill: var(--panel); stroke: var(--user); stroke-width: 1.5; }
+  .cell { fill: var(--cell-bg); stroke: var(--line); stroke-width: 1; }
+  svg .prompt { fill: var(--remote); }
+  svg .cmt { fill: var(--cmt); font-style: italic; }
+  svg .str { fill: var(--str); }
+  .sub { fill: var(--panel); stroke: var(--line); stroke-width: 1; }
+  svg .sublabel { font-size: 10.5px; letter-spacing: 0.08em; font-weight: 600; fill: var(--muted); }
+  svg .t-user { fill: var(--user); }
+  svg .colhead { font-size: 13px; letter-spacing: 0.08em; font-weight: 600; }
+
+  /* Hello world: two notebook columns side by side, stacked on narrow screens */
+  .hw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 760px) { .hw-grid { grid-template-columns: minmax(0, 1fr); } }
+  .hw-col { display: grid; gap: 8px; align-content: start; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .hw-col h3 { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 2px; }
+  .nb-cell { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; }
+  .nb-prompt { font-family: var(--font-mono); font-size: 11.5px; color: var(--remote); padding-top: 9px; white-space: nowrap; }
+  .nb-cell pre { margin: 0; background: var(--cell-bg); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .nb-cell .c { color: var(--cmt); font-style: italic; }
+  .nb-cell .s { color: var(--str); }
+  details.collapsible { display: block; }
+  details.collapsible > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  details.collapsible > summary::-webkit-details-marker { display: none; }
+  details.collapsible > summary:focus-visible { outline: 2px solid var(--remote); outline-offset: 2px; }
+  details.collapsible .toggle { font-size: 0.8rem; font-weight: 700; color: #ffffff; background: var(--lavender); padding: 4px 12px; border-radius: 4px; white-space: nowrap; min-width: 3.5em; text-align: center; }
+  details.collapsible .toggle::after { content: "Show"; }
+  details.collapsible[open] .toggle::after { content: "Hide"; }
+  details.collapsible[open] > summary { margin-bottom: 10px; }
+  details.collapsible > p, details.collapsible > table { margin-top: 0; margin-bottom: 10px; }
+  details.collapsible > summary h2 { margin: 0; }
+  .tag-warn { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-fg); font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; vertical-align: middle; }
+  .paths { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; align-items: stretch; }
+  .paths .colhd { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; align-self: end; }
+  .paths .rowhd { font-weight: 600; font-size: 0.9rem; align-self: center; color: var(--fg); }
+  .path { display: grid; gap: 10px; align-content: start; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+  .path.flyte { border-color: var(--user); border-width: 1.5px; }
+  .path .who { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .path h3 { margin: 0; font-size: 1rem; }
+  .path.flyte h3 { color: var(--user); }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: st; }
+  .steps li { counter-increment: st; display: grid; grid-template-columns: 1.4em minmax(0, 1fr); column-gap: 8px; align-items: start; background: var(--cell-bg); border: 1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius: 4px; padding: 5px 9px; font-size: 0.85rem; line-height: 1.45; min-width: 0; }
+  .steps li::before { content: counter(st); font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; color: var(--muted); padding-top: 1px; }
+  .steps li code { overflow-wrap: anywhere; }
+  .path .gist { font-size: 0.85rem; color: var(--muted); margin: 0; }
+  @media (max-width: 720px) {
+    .paths { grid-template-columns: minmax(0, 1fr); }
+    .paths .colhd { display: none; }
+    .paths .rowhd { margin-top: 6px; }
+  }
+  .path-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .tag-loe { display: inline-block; padding: 1px 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; }
+  .loe-high { background: var(--loe-high-bg); color: var(--loe-high-fg); }
+  .loe-med { background: var(--loe-med-bg); color: var(--loe-med-fg); }
+  .loe-low { background: var(--loe-low-bg); color: var(--loe-low-fg); }
+  .loe-xlow { background: var(--loe-xlow-bg); color: var(--loe-xlow-fg); }
+
+  /* Placeholder sections: dashed box, filled in later */
+  h3.sec { font-size: 0.95rem; margin: 6px 0 0; }
+  .placeholder { border: 1.5px dashed var(--line); border-radius: 8px; padding: 10px 14px; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+  .placeholder .ph-tag { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--line); font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; vertical-align: middle; }
+</style>
+
+<main>
+  <h1>Local development in KFP v2 and Flyte 2</h1>
+  <section class="cmp-wrap" aria-labelledby="summary-h">
+    <h2 id="summary-h">Summary and the ask</h2>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>What this analysis found, in a few sentences, and what we want from the working group (feedback, a decision, or volunteers).</div>
+    <h3 class="sec">Goals</h3>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>Goals: what local development without Kubernetes must make possible. Non-goals: what is out of scope.</div>
+  </section>
+
+  <section class="cmp-wrap" aria-labelledby="problem-h">
+    <h2 id="problem-h">Problem statement and personas</h2>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>The problem with local development in KFP today, in one or two sentences.</div>
+    <ul>
+      <li>Pipeline author</li>
+      <li>Enterprise platform engineer</li>
+    </ul>
+  </section>
+  <section class="cmp-wrap" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">KFPv2 vs Flyte 2 orientation</h2>
+    <p>KFP column: KFP v2 SDK only (checked against <code>kubeflow/pipelines</code>, SDK 2.17). Flyte column: Flyte 2 only (the <code>flyte</code> package, not Flyte 1 <code>flytekit</code>).</p>
+    <table class="cmp">
+      <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <thead><tr><th scope="col">Concept</th><th scope="col">KFP v2 (SDK 2.x)</th><th scope="col">Flyte 2 (<code>flyte</code> SDK)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">One step</th><td><code>@dsl.component</code></td><td><code>@env.task</code></td></tr>
+        <tr><th scope="row">Pipeline</th><td><code>@dsl.pipeline</code></td><td>A parent <code>@env.task</code> that calls other tasks</td></tr>
+        <tr><th scope="row">Image and resources</th><td><code>base_image=</code> on the component; <code>.set_cpu_limit()</code> on the task</td><td><code>flyte.TaskEnvironment(image=, resources=)</code></td></tr>
+        <tr><th scope="row">Fan-out</th><td><code>dsl.ParallelFor</code></td><td><code>flyte.map</code> or <code>asyncio.gather</code></td></tr>
+        <tr><th scope="row">Condition</th><td><code>dsl.If</code></td><td>Python <code>if</code></td></tr>
+        <tr class="key"><th scope="row">Graph is built</th><td>At compile time, to a YAML IR spec</td><td>At run time, as tasks call tasks</td></tr>
+        <tr><th scope="row">Start a run</th><td><code>kfp.Client().create_run_from_pipeline_func(...)</code></td><td><code>flyte.run(main, ...)</code></td></tr>
+        <tr><th scope="row">Local run</th><td><code>kfp.local.init(...)</code> in your code (details below)</td><td><code>flyte run --local</code>, no code change (details below)</td></tr>
+        <tr><th scope="row">Cluster backend</th><td>KFP API server + Argo Workflows on k8s</td><td>Flyte backend on k8s</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="cmp-wrap" aria-labelledby="hw-h">
+    <h2 id="hw-h">Hello world, both ways</h2>
+    <p>The same program in each SDK: compute <code>2x + 5</code> for x in 0..9, then average the results. Comments name the matching table row.</p>
+    <div class="hw-grid">
+      <div class="hw-col">
+        <h3>KFP v2</h3>
+        <div class="nb-cell"><span class="nb-prompt">In [ ]:</span><pre>from kfp import dsl, Client
+
+@dsl.component(base_image=<span class="s">"python:3.11"</span>)  <span class="c"># one step, image</span>
+def fn(x: int) -&gt; int:
+    return 2 * x + 5
+
+@dsl.component(base_image=<span class="s">"python:3.11"</span>)
+def mean(ys: list) -&gt; float:
+    return sum(ys) / len(ys)
+
+@dsl.component(base_image=<span class="s">"python:3.11"</span>)
+def announce():
+    print(<span class="s">"mean &gt; 10"</span>)
+
+@dsl.pipeline                            <span class="c"># pipeline</span>
+def main(x_list: list = list(range(10))):
+    with dsl.ParallelFor(x_list) as x:   <span class="c"># fan-out</span>
+        y = fn(x=x).set_cpu_limit(<span class="s">"1"</span>)   <span class="c"># resources</span>
+    m = mean(ys=dsl.Collected(y.output))
+    with dsl.If(m.output &gt; 10.0):        <span class="c"># condition</span>
+        announce()</pre></div>
+        <div class="nb-cell"><span class="nb-prompt">In [ ]:</span><pre><span class="c"># graph is compiled to YAML before it runs</span>
+Client(host=...).create_run_from_pipeline_func(
+    main, arguments={})
+<span class="c"># or as a local run (kfp.local):</span>
+from kfp import local
+local.init(runner=local.SubprocessRunner())
+main()</pre></div>
+      </div>
+
+      <div class="hw-col">
+        <h3>Flyte 2</h3>
+        <div class="nb-cell"><span class="nb-prompt">In [ ]:</span><pre>import flyte
+
+env = flyte.TaskEnvironment(
+    name=<span class="s">"hello_env"</span>,
+    image=<span class="s">"auto"</span>,                          <span class="c"># image</span>
+    resources=flyte.Resources(cpu=<span class="s">"1"</span>))    <span class="c"># resources</span>
+
+@env.task                                  <span class="c"># one step</span>
+def fn(x: int) -&gt; int:
+    return 2 * x + 5
+
+@env.task                <span class="c"># pipeline = parent task</span>
+def main(x_list: list[int] = list(range(10))) -&gt; float:
+    ys = list(flyte.map(fn, x_list))       <span class="c"># fan-out</span>
+    m = sum(ys) / len(ys)
+    if m &gt; 10.0:                           <span class="c"># condition</span>
+        ...
+    return m</pre></div>
+        <div class="nb-cell"><span class="nb-prompt">In [ ]:</span><pre><span class="c"># graph is built at run time, as tasks call tasks</span>
+flyte.init()
+flyte.run(main)
+<span class="c"># or as a local CLI run:</span>
+!flyte run --local hello.py main</pre></div>
+      </div>
+    </div>
+  </section>
+
+  <details id="paths" class="collapsible" aria-labelledby="paths-h">
+    <summary><span class="toggle" aria-hidden="true"></span><h2 id="paths-h"><span class="tag-warn">[UNVERIFIED SLOP]</span> Four ways to get running locally</h2></summary>
+    <p>Each tool has a path without a cluster and a path with a cluster on your laptop. The two sections below give the details for each row.</p>
+    <div class="paths">
+      <span></span><span class="colhd">KFP v2</span><span class="colhd">Flyte 2</span>
+
+      <span class="rowhd">Without a cluster</span>
+      <div class="path">
+        <div class="path-top"><span class="who">KFP v2</span><span class="tag-loe loe-med">[LOE: Med]</span></div>
+        <h3><code>kfp.local</code></h3>
+        <ol class="steps">
+          <li><span><code>pip install kfp</code></span></li>
+          <li><span>Add <code>local.init(runner=...)</code> to your code, and pick <code>SubprocessRunner</code> or <code>DockerRunner</code></span></li>
+          <li><span>Call <code>my_pipeline()</code> in Python</span></li>
+        </ol>
+        <p class="gist">A code change and a runner choice.</p>
+      </div>
+      <div class="path flyte">
+        <div class="path-top"><span class="who">Flyte 2</span><span class="tag-loe loe-xlow">[LOE: XLow]</span></div>
+        <h3>Fully local, <code>--local</code></h3>
+        <ol class="steps">
+          <li><span><code>pip install flyte</code></span></li>
+          <li><span><code>flyte run --local my_pipeline.py main</code></span></li>
+        </ol>
+        <p class="gist">One flag. No code change.</p>
+      </div>
+
+      <span class="rowhd">With a cluster</span>
+      <div class="path">
+        <div class="path-top"><span class="who">KFP v2</span><span class="tag-loe loe-high">[LOE: High]</span></div>
+        <h3>Your own cluster, then install KFP</h3>
+        <ol class="steps">
+          <li><span>Make a k8s cluster (kind, k3d, or minikube)</span></li>
+          <li><span>Install KFP: three <code>kubectl</code> commands</span></li>
+          <li><span>Run with the CLI (<code>kfp run create</code>), the UI, or <code>kfp.Client</code></span></li>
+        </ol>
+        <p class="gist">You build and connect the cluster yourself.</p>
+      </div>
+      <div class="path flyte">
+        <div class="path-top"><span class="who">Flyte 2</span><span class="tag-loe loe-low">[LOE: Low]</span></div>
+        <h3>Devbox</h3>
+        <ol class="steps">
+          <li><span><code>flyte start devbox</code></span></li>
+          <li><span><code>flyte create config --devbox</code></span></li>
+          <li><span><code>flyte run my_pipeline.py main</code></span></li>
+        </ol>
+        <p class="gist">The cluster and the platform in one command.</p>
+      </div>
+    </div>
+  </details>
+
+  <details id="local-dev" class="collapsible" aria-labelledby="local-h">
+    <summary><span class="toggle" aria-hidden="true"></span><h2 id="local-h"><span class="tag-warn">[UNVERIFIED SLOP]</span> Local development, without a cluster, step by step</h2></summary>
+    <p>Each KFP row was checked against the <code>kfp.local</code> source in <code>kubeflow/pipelines</code> (SDK 2.17). Each Flyte row was checked against <code>flyteorg/flyte-sdk</code>.</p>
+    <table class="cmp">
+      <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <thead><tr><th scope="col">Step</th><th scope="col">KFP v2 (<code>kfp.local</code>)</th><th scope="col">Flyte 2</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Install</th><td><code>pip install kfp</code></td><td><code>pip install flyte</code></td></tr>
+        <tr><th scope="row">Turn on local mode</th><td>Add <code>local.init(runner=...)</code> to your Python code, before you call a component or pipeline.</td><td>No code change. Add <code>--local</code> to the CLI command.</td></tr>
+        <tr><th scope="row">Pick a runner (the runner decides how and where each step runs)</th><td><code>SubprocessRunner</code>: a local subprocess. Lightweight Python Components only.<br><code>DockerRunner</code>: a Docker container. Needs a running Docker daemon and the <code>docker</code> package.<br>One runner for the whole session. A pipeline with a Container Component needs <code>DockerRunner</code> for all its steps.</td><td>No choice to make. Flyte picks for each task: a Python task runs in your process. A <code>ContainerTask</code> runs in a Docker container (needs a running Docker daemon and the <code>docker</code> package).</td></tr>
+        <tr><th scope="row">Run</th><td>Call the pipeline or component in Python, for example <code>my_pipeline(x=1)</code>.</td><td><code>flyte run --local my_pipeline.py main</code></td></tr>
+        <tr class="key"><th scope="row">Work done for each step</th><td><code>SubprocessRunner</code> (default <code>use_venv=True</code>): makes a new temporary venv, then by default runs <code>pip install</code> for <code>kfp</code> and the component's <code>packages_to_install</code>.<br><code>DockerRunner</code>: starts a new container from the component's image.</td><td>Python task: a function call in the same process.<br><code>ContainerTask</code>: starts a new container from its image.</td></tr>
+        <tr><th scope="row">See your runs</th><td>Logs in your terminal. Outputs in <code>./local_outputs</code>. No UI.</td><td>Live TUI with <code>--tui</code> (needs the <code>flyte[tui]</code> extra). Run history when local persistence is on.</td></tr>
+        <tr><th scope="row">Move to a cluster</th><td>Deploy the KFP backend on k8s. Submit with <code>kfp.Client(host=...).create_run_from_pipeline_func(...)</code>.</td><td>Remove <code>--local</code>. Needs a Flyte backend on k8s and a config that points to it.</td></tr>
+      </tbody>
+    </table>
+    </details>
+
+  <details id="cluster-dev" class="collapsible" aria-labelledby="cluster-h">
+    <summary><span class="toggle" aria-hidden="true"></span><h2 id="cluster-h"><span class="tag-warn">[UNVERIFIED SLOP]</span> Local development, with a cluster, step by step</h2></summary>
+    <p>Flyte devbox gives you a real Kubernetes cluster with the full Flyte platform on your laptop, with one command. Your code does not change between the three stages: local (<code>flyte run --local</code>, in your process), devbox (a real cluster on your laptop), and a production cluster. Only the run command and the config change.</p>
+    <table class="cmp">
+      <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+      <thead><tr><th scope="col">Step</th><th scope="col">KFP v2 (standalone, <code>env/dev</code>)</th><th scope="col">Flyte 2 (devbox)</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Prerequisites</th><td>Docker, <code>kubectl</code>, and a local k8s tool (kind, k3d, or minikube)</td><td>Docker</td></tr>
+        <tr><th scope="row">Create a cluster</th><td>With your k8s tool, for example <code>kind create cluster</code></td><td><code>flyte start devbox</code>: one privileged Docker container that runs k3s</td></tr>
+        <tr class="key"><th scope="row">Install the platform</th><td><code>kubectl apply -k ".../cluster-scoped-resources?ref=$PIPELINE_VERSION"</code><br><code>kubectl wait --for condition=established --timeout=60s crd/applications.app.k8s.io</code><br><code>kubectl apply -k ".../env/dev?ref=$PIPELINE_VERSION"</code></td><td>Nothing to install. The container includes the Flyte backend, the UI, an object store, and an image registry. Devbox also adds the cluster to your kubeconfig.</td></tr>
+        <tr><th scope="row">Open the UI</th><td><code>kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8080:80</code>, then <code>http://localhost:8080</code> (this step is from older docs)</td><td><code>http://localhost:30080/v2</code></td></tr>
+        <tr><th scope="row">Point the SDK at the cluster</th><td><code>client = kfp.Client(host="http://localhost:8080")</code></td><td><code>flyte create config --devbox</code></td></tr>
+        <tr><th scope="row">Run</th><td><code>client.create_run_from_pipeline_func(my_pipeline)</code></td><td><code>flyte run my_pipeline.py main</code> (no <code>--local</code>)</td></tr>
+        <tr><th scope="row">Custom images</th><td>Lightweight Python Components need no image build: each step pulls <code>base_image</code> and runs <code>pip install</code> when it starts. Your own images must be in a registry that the cluster can pull from (with kind: <code>kind load docker-image</code>).</td><td>Built on your machine (the config sets <code>--builder local</code>) and pushed to the devbox registry at <code>localhost:30000</code>.</td></tr>
+        <tr><th scope="row">Tear down</th><td><code>kind delete cluster</code></td><td><code>flyte stop devbox</code> or <code>flyte delete devbox</code></td></tr>
+        <tr><th scope="row">Intended use</th><td>First experiments, not production</td><td>Local development, not production</td></tr>
+      </tbody>
+    </table>
+    <p>Sources: the Flyte rows come from <code>flyte/cli/_devbox.py</code> and <code>flyte/cli/_create.py</code> in <code>flyteorg/flyte-sdk</code>. The KFP rows come from the official KFP v2 install docs. Neither setup was run for this page.</p>
+    </details>
+
+
+  <section class="cmp-wrap" aria-labelledby="kia-h">
+    <h2 id="kia-h">Key Insight A: Flyte gives the user one set of verbs that the Flyte SDK handles quietly for either local or remote execution</h2>
+
+  <p>The task code always calls <code>submit()</code>. Flyte sets one controller at startup. The controller decides how the task runs: in your local Python process, or in a pod on Kubernetes.</p>
+
+  <div class="wrap">
+    <svg viewBox="0 0 1190 950" role="img" aria-label="Diagram in two columns. User facing: the run command, TaskEnvironment, flyte.map and await my_task(item). Flyte internals: create_controller fills one slot at startup; each task call goes to controller.submit, then get_controller, then LocalController or RemoteController.">
+      <defs>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--line)"/></marker>
+        <marker id="head-local" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--local)"/></marker>
+        <marker id="head-remote" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--remote)"/></marker>
+      </defs>
+
+      <rect x="10" y="8" width="440" height="932" rx="10" class="col-user"/>
+      <rect x="460" y="8" width="720" height="932" rx="10" class="col-internal"/>
+      <text x="30" y="34" class="colhead t-user">USER FACING</text>
+      <text x="480" y="34" class="colhead muted">FLYTE INTERNALS</text>
+      <text x="30" y="62" class="zone">STARTUP (ONE TIME)</text>
+      <line x1="10" y1="170" x2="1180" y2="170" class="divider"/>
+      <text x="30" y="192" class="zone">DEFINITION TIME</text>
+      <line x1="10" y1="318" x2="1180" y2="318" class="divider"/>
+      <text x="30" y="340" class="zone">EACH TASK CALL</text>
+
+
+      <rect x="80" y="76" width="350" height="80" rx="3" class="cell"/>
+      <text x="22" y="102" class="mono prompt" font-size="12">In [ ]:</text>
+      <text x="92" y="102" class="mono" font-size="13">!flyte run <tspan class="str">--local</tspan> my_pipeline.py main</text>
+      <text x="92" y="124" class="mono cmt" font-size="13"># remote: drop --local</text>
+      <text x="92" y="144" class="mono cmt" font-size="13"># or in Python: flyte.run(main)</text>
+      <path d="M430,116 L591,116" class="arrow"/>
+
+      <rect x="595" y="76" width="450" height="80" rx="6" class="box-core"/>
+      <text x="820" y="122" text-anchor="middle" class="mono" font-size="16" font-weight="600">create_controller("local" | "remote")</text>
+      <path d="M1045,116 L1100,116 L1100,629 L1049,629" class="arrow" style="stroke-dasharray: 6 4"/>
+      <text x="1108" y="364" class="muted" font-size="13">fills the</text>
+      <text x="1108" y="381" class="muted" font-size="13">slot</text>
+
+      <rect x="80" y="204" width="350" height="100" rx="3" class="cell"/>
+      <text x="22" y="228" class="mono prompt" font-size="12">In [ ]:</text>
+      <text x="92" y="228" class="mono" font-size="13">env = flyte.TaskEnvironment(</text>
+      <text x="92" y="247" class="mono" font-size="13">    name=<tspan class="str">"my_env"</tspan>,</text>
+      <text x="92" y="266" class="mono" font-size="13">    image=..., resources=...)</text>
+      <text x="92" y="290" class="mono cmt" font-size="13"># sets settings; never calls submit()</text>
+      <path d="M430,254 L700,480" class="arrow" style="stroke-dasharray: 6 4"/>
+      <text x="620" y="394" class="muted" font-size="13">the task carries</text>
+      <text x="620" y="411" class="muted" font-size="13">its env settings</text>
+
+      <rect x="80" y="354" width="350" height="70" rx="3" class="cell"/>
+      <text x="22" y="382" class="mono prompt" font-size="12">In [ ]:</text>
+      <text x="92" y="382" class="mono" font-size="13">results = list(flyte.map(my_task, items))</text>
+      <text x="92" y="406" class="mono cmt" font-size="13"># calls my_task one time per item</text>
+      <path d="M255,424 L185,480" class="arrow"/>
+      <path d="M255,424 L255,480" class="arrow"/>
+      <path d="M255,424 L325,480" class="arrow"/>
+      <text x="340" y="458" class="muted" font-size="13">N calls</text>
+
+      <rect x="80" y="484" width="350" height="70" rx="3" class="cell"/>
+      <text x="22" y="512" class="mono prompt" font-size="12">In [ ]:</text>
+      <text x="92" y="512" class="mono" font-size="13">result = await my_task(item)</text>
+      <text x="92" y="536" class="mono cmt" font-size="13"># one call to my_task</text>
+      <path d="M430,519 L591,519" class="arrow"/>
+
+      <rect x="595" y="484" width="450" height="70" rx="6" class="box-core"/>
+      <text x="820" y="514" text-anchor="middle" class="mono" font-size="16" font-weight="600">controller.submit(task, *args)</text>
+      <text x="820" y="537" text-anchor="middle" class="muted" font-size="13">Same verb each time. The task does not know where it runs.</text>
+      <path d="M820,554 L820,590" class="arrow"/>
+
+      <rect x="595" y="594" width="450" height="70" rx="6" class="box-core"/>
+      <text x="820" y="624" text-anchor="middle" class="mono" font-size="16" font-weight="600">get_controller()</text>
+      <text x="820" y="647" text-anchor="middle" class="muted" font-size="13">reads the controller from the slot</text>
+
+      <path d="M760,664 L655,700" class="arrow-local"/>
+      <path d="M880,664 L985,700" class="arrow-remote"/>
+      <rect x="480" y="704" width="330" height="220" rx="6" class="box-local"/>
+      <text x="496" y="732" class="mono t-local" font-size="16" font-weight="600">LocalController</text>
+      <text x="496" y="752" class="muted" font-size="13">when: no backend configured, or --local</text>
+      <rect x="492" y="764" width="306" height="44" rx="4" class="sub"/>
+      <text x="504" y="781" class="sublabel">INPUTS</text>
+      <text x="504" y="799" font-size="13">Passed in memory</text>
+      <rect x="492" y="816" width="306" height="44" rx="4" class="sub"/>
+      <text x="504" y="833" class="sublabel">RUNS IN</text>
+      <text x="504" y="851" font-size="13">This Python process (your env)</text>
+      <rect x="492" y="868" width="306" height="44" rx="4" class="sub"/>
+      <text x="504" y="885" class="sublabel">OUTPUTS</text>
+      <text x="504" y="903" font-size="13">Returned in memory</text>
+
+      <rect x="830" y="704" width="330" height="220" rx="6" class="box-remote"/>
+      <text x="846" y="732" class="mono t-remote" font-size="16" font-weight="600">RemoteController</text>
+      <text x="846" y="752" class="muted" font-size="13">when: the task runs in a k8s pod</text>
+      <rect x="842" y="764" width="306" height="44" rx="4" class="sub"/>
+      <text x="854" y="781" class="sublabel">INPUTS</text>
+      <text x="854" y="799" font-size="13">Uploaded to object storage</text>
+      <rect x="842" y="816" width="306" height="44" rx="4" class="sub"/>
+      <text x="854" y="833" class="sublabel">RUNS IN</text>
+      <text x="854" y="851" font-size="13">New k8s pod (env image + resources)</text>
+      <rect x="842" y="868" width="306" height="44" rx="4" class="sub"/>
+      <text x="854" y="885" class="sublabel">OUTPUTS</text>
+      <text x="854" y="903" font-size="13">Downloaded from object storage</text>
+    </svg>
+  </div>
+
+  <ul>
+    <li><code>flyte.map</code> has no separate route to the controller. It calls <code>task.aio()</code> for each item, so each item uses the same <code>submit()</code> path as a direct call.</li>
+    <li><code>@env.task</code> comes from <code>env = flyte.TaskEnvironment(...)</code>. There is no <code>flyte.env</code> object. The environment runs at definition time, not at call time. It puts the image and resources on the task. The remote controller sends them with the task spec (<code>translate_task_to_wire</code>). The local controller uses the image only for the cache version.</li>
+    <li>Sources: <code>flyte/_task.py</code>, <code>flyte/_map.py</code>, <code>flyte/_internal/controllers/__init__.py</code>, <code>flyte/_run.py</code> in <code>flyteorg/flyte-sdk</code>.</li>
+  </ul>
+  </section>
+
+  <section class="cmp-wrap" aria-labelledby="kib-h">
+    <h2 id="kib-h">Key Insight B</h2>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>Key Insight B, in one sentence, with its supporting evidence.</div>
+  </section>
+
+  <section class="cmp-wrap" aria-labelledby="kic-h">
+    <h2 id="kic-h">Key Insight C</h2>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>Key Insight C, in one sentence, with its supporting evidence.</div>
+  </section>
+
+  <section class="cmp-wrap" aria-labelledby="options-h">
+    <h2 id="options-h">Enhancement options for KFP</h2>
+    <div class="placeholder"><span class="ph-tag">PLACEHOLDER</span>The candidate enhancements for local development in KFP, each with its trade-offs.</div>
+  </section>
+</main>
+
+</body></html>
